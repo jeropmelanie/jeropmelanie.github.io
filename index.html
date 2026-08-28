@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>meiks | Terminal</title>
+
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%230a0f0d%22/><text x=%2250%25%22 y=%2262%25%22 font-size=%2260%22 text-anchor=%22middle%22 fill=%22%2300ff66%22 font-family=%22monospace%22>&gt;_</text></svg>">
+
+    <meta property="og:title" content="meiks | Terminal">
+    <meta property="og:description" content="Android modder & dev (Kotlin, C++, Python). Systemless developer, level 99.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="avatar.jpg">
+    <meta name="theme-color" content="#00ff66">
+
+    <style>
+        :root {
+            --toxic-green: #00ff66;
+            --dark-bg: #0a0f0d;
+            --panel-bg: #121a16;
+            --text-main: #e0eee0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        html, body {
+            background-color: var(--dark-bg);
+            overflow-x: hidden;
+        }
+
+        body {
+            color: var(--text-main);
+            min-height: 100vh;
+            position: relative;
+        }
+
+        #matrix-canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+            opacity: 0.35;
+        }
+
+        #intro-overlay {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            transition: opacity 0.6s ease, visibility 0.6s ease;
+        }
+
+        #intro-overlay.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+
+        #boot-text {
+            color: var(--toxic-green);
+            font-size: 15px;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            max-width: 90%;
+            min-height: 200px;
+            text-shadow: 0 0 8px rgba(0, 255, 102, 0.6);
+        }
+
+        .cursor {
+            display: inline-block;
+            background: var(--toxic-green);
+            width: 8px; height: 14px;
+            margin-left: 2px;
+            animation: blink 0.8s steps(1) infinite;
+            vertical-align: middle;
+        }
+
+        @keyframes blink { 50% { opacity: 0; } }
+
+        #access-granted {
+            color: var(--toxic-green);
+            font-size: 28px;
+            font-weight: bold;
+            letter-spacing: 3px;
+            text-shadow: 0 0 20px rgba(0, 255, 102, 0.8);
+            opacity: 0;
+            margin-top: 20px;
+        }
+
+        #access-granted.show { animation: flashIn 0.4s ease forwards; }
+
+        @keyframes flashIn {
+            0% { opacity: 0; transform: scale(0.9); }
+            50% { opacity: 1; transform: scale(1.05); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        #main-content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 20px;
+            opacity: 0;
+            transition: opacity 0.8s ease;
+        }
+
+        #main-content.visible { opacity: 1; }
+
+        .dashboard {
+            background: rgba(18, 26, 22, 0.92);
+            backdrop-filter: blur(2px);
+            border: 2px solid var(--toxic-green);
+            box-shadow: 0 0 20px rgba(0, 255, 102, 0.2);
+            width: 100%;
+            max-width: 950px;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .header-bar {
+            background: #1a2620;
+            padding: 12px;
+            border-bottom: 2px solid var(--toxic-green);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .dots { display: flex; gap: 6px; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; background: #ff5f56; }
+        .dot:nth-child(2) { background: #ffbd2e; }
+        .dot:nth-child(3) { background: #27c93f; }
+
+        .title {
+            color: var(--toxic-green);
+            font-weight: bold;
+            font-size: 13px;
+            letter-spacing: 1px;
+            text-align: center;
+        }
+
+        .header-spacer { width: 48px; }
+
+        .bento-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 14px;
+            padding: 18px;
+        }
+
+        @media (min-width: 720px) {
+            .bento-grid {
+                grid-template-columns: 220px 1fr;
+            }
+        }
+
+        .sidebar {
+            border: 1px solid var(--toxic-green);
+            border-radius: 8px;
+            background: rgba(0, 255, 102, 0.03);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .avatar-container {
+            position: relative;
+            width: 110px; height: 110px;
+            border-radius: 50%;
+            margin-bottom: 14px;
+            border: 3px solid var(--toxic-green);
+            box-shadow: 0 0 15px rgba(0, 255, 102, 0.4);
+            overflow: hidden;
+            background: #050806;
+        }
+
+        .avatar-container img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            filter: blur(4px) contrast(1.1) brightness(0.9);
+            transform: scale(1.1);
+        }
+
+        h1 {
+            color: var(--toxic-green);
+            font-size: 22px;
+            margin-bottom: 4px;
+            text-shadow: 0 0 10px rgba(0, 255, 102, 0.5);
+        }
+
+        .level-badge {
+            display: inline-block;
+            background: #0e1512;
+            border: 1px solid var(--toxic-green);
+            color: var(--toxic-green);
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            letter-spacing: 1px;
+            margin-bottom: 16px;
+        }
+
+        .sidebar-label {
+            font-size: 10px;
+            color: #7a9284;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            align-self: flex-start;
+            margin-bottom: 8px;
+            margin-top: 6px;
+        }
+
+        .links-container {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .action-btn {
+            display: block;
+            width: 100%;
+            background: transparent;
+            border: 1px solid var(--toxic-green);
+            color: var(--toxic-green);
+            padding: 11px 8px;
+            font-size: 12px;
+            font-weight: bold;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+            letter-spacing: 0.3px;
+            text-align: center;
+        }
+
+        .action-btn:hover {
+            background: var(--toxic-green);
+            color: var(--dark-bg);
+            box-shadow: 0 0 15px rgba(0, 255, 102, 0.4);
+        }
+
+        .right-col {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .bio-box {
+            background: rgba(0, 255, 102, 0.05);
+            border-left: 4px solid var(--toxic-green);
+            border-radius: 4px;
+            padding: 14px;
+            font-size: 13px;
+            line-height: 1.5;
+            text-align: left;
+            min-height: 90px;
+        }
+
+        .panes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+        }
+
+        .pane {
+            border: 1px solid #224430;
+            border-radius: 8px;
+            background: #0e1512;
+            padding: 14px;
+        }
+
+        .pane-title {
+            font-size: 11px;
+            color: var(--toxic-green);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #224430;
+            padding-bottom: 6px;
+        }
+
+        .pane-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .badge {
+            background: #18241f;
+            border: 1px solid #224430;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            color: var(--text-main);
+            transition: all 0.2s ease-in-out;
+        }
+
+        .badge:hover {
+            border-color: var(--toxic-green);
+            box-shadow: 0 0 8px rgba(0, 255, 102, 0.3);
+            color: var(--toxic-green);
+        }
+
+        .status-bar {
+            border-top: 1px solid #224430;
+            background: #0c1310;
+            padding: 10px 18px;
+            font-size: 11px;
+            color: #7a9284;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            justify-content: center;
+        }
+
+        .status-bar span {
+            color: var(--toxic-green);
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="matrix-canvas"></canvas>
+
+    <div id="intro-overlay">
+        <div id="boot-text"></div>
+        <div id="access-granted">ACCESS GRANTED</div>
+    </div>
+
+    <div id="main-content">
+        <div class="dashboard">
+            <div class="header-bar">
+                <div class="dots">
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                </div>
+                <div class="title">ACCESS GRANTED // SYSTEM_OVERRIDE_ENABLED</div>
+                <div class="header-spacer"></div>
+            </div>
+
+            <div class="bento-grid">
+                <div class="sidebar">
+                    <div class="avatar-container">
+                        <img src="avatar.jpg" alt="meiks Profile picture">
+                    </div>
+                    <h1>meiks</h1>
+                    <div class="level-badge">LEVEL_99</div>
+
+                    <div class="sidebar-label">> System Actions</div>
+                    <div class="links-container">
+                        <a href="https://github.com/jeropmelanie" target="_blank" class="action-btn">[ GITHUB ]</a>
+                        <a href="https://t.me/thee.3514" target="_blank" class="action-btn">[ TELEGRAM ]</a>
+                        <a href="https://instagram.com/thee.3514" target="_blank" class="action-btn">[ INSTAGRAM ]</a>
+                    </div>
+                </div>
+
+                <div class="right-col">
+                    <div class="bio-box" id="bio-box"><span id="bio-text"></span><span class="cursor" id="bio-cursor"></span></div>
+
+                    <div class="panes-grid">
+                        <div class="pane">
+                            <div class="pane-title">Low-Level Tech</div>
+                            <div class="pane-tags">
+                                <div class="badge">C / C++</div>
+                                <div class="badge">MediaTek MTK</div>
+                                <div class="badge">Magisk</div>
+                            </div>
+                        </div>
+                        <div class="pane">
+                            <div class="pane-title">App Dev</div>
+                            <div class="pane-tags">
+                                <div class="badge">Kotlin</div>
+                                <div class="badge">Java</div>
+                                <div class="badge">Python</div>
+                            </div>
+                        </div>
+                        <div class="pane">
+                            <div class="pane-title">Hardware Target</div>
+                            <div class="pane-tags">
+                                <div class="badge">Samsung A-Series</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="status-bar">
+                <div>STATUS: <span>IDEAL</span></div>
+                <div>MEMORY: <span>NOMINAL</span></div>
+                <div>REPOS: <span id="stat-repos">—</span></div>
+                <div>FOLLOWERS: <span id="stat-followers">—</span></div>
+                <div>STARS: <span id="stat-stars">—</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('matrix-canvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        const chars = 'アイウエオカキクケコサシスセソ01#$&meiks<>{}/'.split('');
+        const fontSize = 14;
+        let columns = Math.floor(canvas.width / fontSize);
+        let drops = Array(columns).fill(1);
+
+        function drawMatrix() {
+            ctx.fillStyle = 'rgba(10, 15, 13, 0.08)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#00ff66';
+            ctx.font = fontSize + 'px monospace';
+
+            for (let i = 0; i < drops.length; i++) {
+                const text = chars[Math.floor(Math.random() * chars.length)];
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+        }
+        setInterval(drawMatrix, 50);
+
+        const bootLines = [
+            'INITIALIZING SYSTEM_OVERRIDE...',
+            'Mounting /dev/meiks ...',
+            'Loading modules: kotlin.ko c_cpp.ko python.ko magisk.ko',
+            'Bypassing OEM lock... OK',
+            'Authenticating user: meiks',
+            'Verifying root access... GRANTED'
+        ];
+
+        const bootTextEl = document.getElementById('boot-text');
+        const accessGrantedEl = document.getElementById('access-granted');
+        const introOverlay = document.getElementById('intro-overlay');
+        const mainContent = document.getElementById('main-content');
+
+        let lineIndex = 0;
+        let charIndex = 0;
+        let displayed = '';
+
+        function typeBoot() {
+            if (lineIndex < bootLines.length) {
+                const currentLine = bootLines[lineIndex];
+                if (charIndex < currentLine.length) {
+                    displayed += currentLine[charIndex];
+                    charIndex++;
+                    bootTextEl.innerHTML = displayed + '<span class="cursor"></span>';
+                    setTimeout(typeBoot, 18);
+                } else {
+                    displayed += '\n';
+                    lineIndex++;
+                    charIndex = 0;
+                    setTimeout(typeBoot, 150);
+                }
+            } else {
+                bootTextEl.innerHTML = displayed;
+                setTimeout(() => {
+                    accessGrantedEl.classList.add('show');
+                    setTimeout(() => {
+                        introOverlay.classList.add('hidden');
+                        mainContent.classList.add('visible');
+                        cycleBio();
+                    }, 900);
+                }, 300);
+            }
+        }
+        setTimeout(typeBoot, 300);
+
+        const bios = [
+            "[root@meiks]# whoami\nAndroid modder & systems dev. Kotlin, C++, Python. I break stock firmware, root what shouldn't be rooted, and patch what's left. Off the grid? Drop-hunting in PUBG Mobile. 🪂",
+            "Rooting devices by day, dropping into PUBG Mobile by night. Kotlin. C++. Python. If it has a bootloader, I'll unlock it.",
+            "> exec breach_stock_firmware.sh\nAndroid modder & dev running Kotlin / C++ / Python. Patch, root, repeat. Standby mode = drop-hunting in PUBG Mobile. 🪂"
+        ];
+
+        const bioTextEl = document.getElementById('bio-text');
+        let bioIndex = 0;
+        let bioCharIndex = 0;
+        let bioDeleting = false;
+
+        function cycleBio() {
+            const current = bios[bioIndex];
+
+            if (!bioDeleting) {
+                bioCharIndex++;
+                bioTextEl.textContent = current.slice(0, bioCharIndex);
+                if (bioCharIndex === current.length) {
+                    bioDeleting = true;
+                    setTimeout(cycleBio, 2600);
+                    return;
+                }
+                setTimeout(cycleBio, 16);
+            } else {
+                bioCharIndex--;
+                bioTextEl.textContent = current.slice(0, bioCharIndex);
+                if (bioCharIndex === 0) {
+                    bioDeleting = false;
+                    bioIndex = (bioIndex + 1) % bios.length;
+                    setTimeout(cycleBio, 300);
+                    return;
+                }
+                setTimeout(cycleBio, 8);
+            }
+        }
+
+        async function loadGithubStats() {
+            try {
+                const userRes = await fetch('https://api.github.com/users/jeropmelanie');
+                const userData = await userRes.json();
+                document.getElementById('stat-repos').textContent = userData.public_repos ?? '—';
+                document.getElementById('stat-followers').textContent = userData.followers ?? '—';
+
+                const reposRes = await fetch('https://api.github.com/users/jeropmelanie/repos?per_page=100');
+                const reposData = await reposRes.json();
+
+                if (Array.isArray(reposData)) {
+                    const totalStars = reposData.reduce((sum, repo) => sum + (repo.stargazers_count || 0), 0);
+                    document.getElementById('stat-stars').textContent = totalStars;
+                } else {
+                    document.getElementById('stat-stars').textContent = '0';
+                }
+            } catch (err) {
+                document.getElementById('stat-repos').textContent = '?';
+                document.getElementById('stat-followers').textContent = '?';
+                document.getElementById('stat-stars').textContent = '?';
+            }
+        }
+        loadGithubStats();
+    </script>
+
+</body>
+  </html>
